@@ -14,10 +14,7 @@ const BasicTable = ({listOfColumns, rows, rowNames}) => {
         </TableHead>
         <TableBody>
           {rows.map((row) => (
-            <TableRow
-              key={nanoid()}
-              sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-            >
+            <TableRow key={nanoid()} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
               {rowNames.map(rowValue => <TableCell key={nanoid()}>{row[rowValue]}</TableCell>)}
             </TableRow>
           ))}
