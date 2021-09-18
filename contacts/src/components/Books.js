@@ -1,20 +1,12 @@
 import React from "react";
-import { useQuery, gql } from "@apollo/client";
-import BasicTable from "./Table";
+import { useQuery } from "@apollo/client";
+import BasicTable from "./BasicTable";
+import { ALL_BOOKS } from "../queries/bookQueries";
 
-const All_BOOKS = gql`
-  query {
-    allBooks {
-      title,
-      published,
-      author
-    }
-  }
-`
 const columns = ['Title', 'Published', 'Author']
 const rowNames = ['title', 'published', 'author']
 const Books = () => {
-    const result = useQuery(All_BOOKS);
+    const result = useQuery(ALL_BOOKS);
     if (result.loading) {
       return <div>Loading...</div>
     }
