@@ -6,7 +6,6 @@ const Authors = require('./models/authors')
 const Books = require('./models/books')
 const User = require('./models/user')
 require('dotenv').config()
-
 mongoose.connect(process.env.MONGO_URI)
     .then(() => {
         console.log('hey')
