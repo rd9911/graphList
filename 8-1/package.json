@@ -9,11 +9,16 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "apollo-server": "^3.3.0",
+    "@graphql-tools/schema": "^8.2.0",
+    "apollo-server-core": "^3.4.0",
+    "apollo-server-express": "^3.4.0",
     "dotenv": "^10.0.0",
-    "graphql": "^15.5.3",
+    "express": "^4.17.1",
+    "graphql": "^15.6.1",
+    "graphql-subscriptions": "^1.2.1",
     "jsonwebtoken": "^8.5.1",
     "mongoose": "^6.0.7",
-    "nanoid": "^3.1.25"
+    "nanoid": "^3.1.25",
+    "subscriptions-transport-ws": "^0.9.19"
   }
 }

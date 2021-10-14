@@ -3,18 +3,17 @@ import { useQuery } from "@apollo/client";
 import BasicTable from "./BasicTable";
 import { ALL_BOOKS } from "../queries/bookQueries";
 
-
-const columns = ['Title', 'Published', 'Author']
-const rowNames = ['title', 'published', 'author']
-const Books = () => {
+export const columns = ['Title', 'Published', 'Author']
+export const rowNames = ['title', 'published', 'author']
+const Books = (props) => {
     const [pickedGenre, setPickedGenre] = useState('')
-    const result = useQuery(ALL_BOOKS);
-    let genres = ['refactoring', 'agile', 'patterns', 'design', 'crime', 'classic', 'all genres']
-    if (result.loading) {
+    const books = useQuery(ALL_BOOKS);
+    if (books.loading) {
       return <div>Loading...</div>
     }
-    let booksToShow = !pickedGenre || pickedGenre === 'all genres' ? result.data.allBooks
-        : result.data.allBooks.filter(book => book.genres.includes(pickedGenre))
+    let genres = ['refactoring', 'agile', 'patterns', 'design', 'crime', 'classic', 'all genres']
+    let booksToShow = !pickedGenre || pickedGenre === 'all genres' ? books.data.allBooks
+        : books.data.allBooks.filter(book => book.genres.includes(pickedGenre))
 
     return (
         <div>

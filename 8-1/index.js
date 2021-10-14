@@ -1,10 +1,18 @@
-const { ApolloServer, gql, UserInputError } = require('apollo-server')
+const { ApolloServer, gql, UserInputError } = require('apollo-server-express')
+const { ApolloServerPluginDrainServer } = require('apollo-server-core')
+const { execute, subscribe } = require('graphql')
+const { SubscriptionServer } = require('subscriptions-transport-ws')
+const { makeExecutableSchema } = require('@graphql-tools/schema')
+const { PubSub } = require('graphql-subscriptions')
+const express = require('express')
+const http = require('http')
 const jwt = require('jsonwebtoken')
 const mongoose = require('mongoose')
 const { nanoid } = require('nanoid')
 const Authors = require('./models/authors')
 const Books = require('./models/books')
 const User = require('./models/user')
+const { ApolloServerPluginDrainHttpServer } = require('apollo-server-core/dist/plugin/drainHttpServer')
 require('dotenv').config()
 mongoose.connect(process.env.MONGO_URI)
     .then(() => {
@@ -12,56 +20,63 @@ mongoose.connect(process.env.MONGO_URI)
     })
 
 const JWT_SECRET = "Secure"
+const app = express()
+const httpServer = http.createServer(app)
+const pubsub = new PubSub()
 
 const typeDefs = gql`
-type Book {
-    title: String!
-    published: Int!
-    author: Author!
-    id: ID!
-    genres: [String!]!
-}
-type Author {
-    name: String!
-    born: Int
-    bookCount: Int
-}
-type User {
-    username: String!
-    favoriteGenre: String!
-    id: ID!
-}
-type Token {
-    value: String!
-}
-type Query {
-    booksCount: Int!
-    authorsCount: Int!
-    allBooks (author: String, genre: String): [Book!]!
-    allAuthors: [Author],
-    me: User
-}
-type Mutation {
-    createUser(
-        username: String!
-        favoriteGenre: String!
-    ): User
-    login(
-        username: String!
-        password: String!
-    ): Token
-    addBook(
+    type Book {
         title: String!
         published: Int!
-        author: String!
-        id: String
+        author: Author!
+        id: ID!
         genres: [String!]!
-    ): Book
-    editAuthor(
+    }
+    type Author {
         name: String!
-        bornTo: Int!
-    ): Author
-}
+        born: Int
+        bookCount: Int
+    }
+    type User {
+        username: String!
+        favoriteGenre: String!
+        id: ID!
+    }
+    type Token {
+        value: String!
+    }
+    type Query {
+        booksCount: Int!
+        authorsCount: Int!
+        allBooks (author: String, genre: String): [Book!]!
+        allAuthors: [Author],
+        me: User
+    }
+    type Mutation {
+        createUser(
+            username: String!
+            favoriteGenre: String!
+        ): User
+        login(
+            username: String!
+            password: String!
+        ): Token
+        addBook(
+            title: String!
+            published: Int!
+            author: String!
+            id: String
+            genres: [String!]!
+        ): Book
+        editAuthor(
+            name: String!
+            bornTo: Int!
+        ): Author
+    }
+    type Subscription {
+        bookAdded: Book!
+    }
+
 `
 
 const resolvers = {
@@ -78,7 +93,8 @@ const resolvers = {
                 return filteredBooks
             }
             else if (args.genre) {
-                return Books.find( { genres: args.genre })
+                const books = await Books.find( { genres: args.genre })
+                return books
             }
             return await Books.find({})
         },
@@ -146,12 +162,19 @@ const resolvers = {
                     })
             }
             const bookToAdd = new Books({ ...args, author: author._id })
-            return await bookToAdd.save()
+            await bookToAdd.save()
                 .catch (error => {
-                    UserInputError(error.message, {
+                    new UserInputError(error.message, {
                         invalidArgs: args,
                     })
                 })
+            try {
+                pubsub.publish('BOOK ADDED', {bookAdded: bookToAdd})
+            } catch(error) {
+                console.log(error)
+            }
+            return bookToAdd
+
         },
         editAuthor: async (root, args, context) => {
             if (!context.currentUser) {
@@ -161,22 +184,44 @@ const resolvers = {
             const editedAuthor = await Authors.findOne({ name: args.name })
             return editedAuthor
         }
-    }
-}
-
-const server = new ApolloServer({
-    typeDefs,
-    resolvers,
-    context: async ({req}) => {
-        const auth = req ? req.headers.authorization : null
-        if (auth && auth.toLowerCase().startsWith('bearer ')) {
-            const decodedToken = jwt.verify( auth.substring(7), JWT_SECRET )
-            const currentUser = await User.findById(decodedToken.id)
-            return { currentUser }
+    },
+    Subscription: {
+        bookAdded: {
+            subscribe: () => {
+                console.log(pubsub)
+                return pubsub.asyncIterator(['BOOK ADDED'])
+            }
         }
     }
-})
+};
 
-server.listen().then(({url}) => {
-    console.log('Serer is ready at ', url)
-})
+(async function () {
+    const schema = makeExecutableSchema({ typeDefs, resolvers });
+    const subscriptionServer = SubscriptionServer.create(
+        { schema, execute, subscribe },
+        { server: httpServer, path: '/graphql' }
+    );
+    const server = new ApolloServer({
+        schema,
+        plugins: [{
+            async serverWillStart() {
+                return { async ApolloServerPluginDrainServer() { subscriptionServer.close() } }
+            }
+        }],
+        context: async ({req}) => {
+            const auth = req ? req.headers.authorization : null
+            if (auth && auth.toLowerCase().startsWith('bearer ')) {
+                const decodedToken = jwt.verify( auth.substring(7), JWT_SECRET )
+                const currentUser = await User.findById(decodedToken.id)
+                return { currentUser }
+            };
+        }
+    });
+    await server.start()
+    server.applyMiddleware({
+        app,
+        path: '/'
+    })
+    const PORT = 4000
+    httpServer.listen(PORT, () => console.log(`Connected to the server in ${PORT}`) );
+})();

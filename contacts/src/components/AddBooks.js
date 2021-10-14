@@ -1,16 +1,21 @@
 import React, { useState } from "react";
 import { useMutation } from '@apollo/client'
 import { useHistory } from "react-router";
-import { ALL_BOOKS, ADD_BOOKS } from "../queries/bookQueries";
+import { ADD_BOOKS } from "../queries/bookQueries";
 
 
-const AddBooks = () => {
+const AddBooks = ({ updateCacheWith }) => {
     const [title, setTitle] = useState('')
     const [published, setPublished] = useState(0)
     const [author, setAuthor] = useState('')
     const [genres, setGenres] = useState([])
     const [ addBook ] = useMutation(ADD_BOOKS, {
-        refetchQueries: [ {query: ALL_BOOKS} ]
+        onError: (error) => {
+            console.log(error.graphQLErrors[0])
+        },
+        update: (store, response) => {
+            updateCacheWith(response.data.addBook)
+        }
     })
     const history = useHistory()
 
