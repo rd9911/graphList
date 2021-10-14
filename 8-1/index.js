@@ -4,6 +4,7 @@ const { execute, subscribe } = require('graphql')
 const { SubscriptionServer } = require('subscriptions-transport-ws')
 const { makeExecutableSchema } = require('@graphql-tools/schema')
 const { PubSub } = require('graphql-subscriptions')
+const cors = require('cors')
 const express = require('express')
 const http = require('http')
 const jwt = require('jsonwebtoken')
@@ -23,6 +24,7 @@ const JWT_SECRET = "Secure"
 const app = express()
 const httpServer = http.createServer(app)
 const pubsub = new PubSub()
+app.use(cors())
 
 const typeDefs = gql`
     type Book {
@@ -96,7 +98,9 @@ const resolvers = {
                 const books = await Books.find( { genres: args.genre })
                 return books
             }
-            return await Books.find({})
+            const books = await Books.find({}).populate('author')
+            console.log(books)
+            return books
         },
         allAuthors: async () => {
             const authors = await Authors.find({})
@@ -106,18 +110,18 @@ const resolvers = {
             return context.currentUser
         }
     },
-    Book: {
-        author: async (root) => {
-            const naemOfAuthor = root.author 
-            let authorFullDetails;
-            authorFullDetails = await Authors.findOne({ name: naemOfAuthor })
-            if (!authorFullDetails) {
-                authorFullDetails = await Authors.findById( mongoose.Types.ObjectId(root.author) )
-            }
-            return authorFullDetails
-        }
-    },
-    Author: {
+    // Book: {
+    //     author: async (root) => {
+    //         const naemOfAuthor = root.author 
+    //         let authorFullDetails;
+    //         authorFullDetails = await Authors.findOne({ name: naemOfAuthor })
+    //         if (!authorFullDetails) {
+    //             authorFullDetails = await Authors.findById( mongoose.Types.ObjectId(root.author) )
+    //         }
+    //         return authorFullDetails
+    //     }
+    // },
+    Author: { // optimize it with adding books array field to Author and put there objectIDs
         bookCount: async (root) => {
             const nameOfAuthor = root.name
             const books = await Books.find({})
@@ -139,7 +143,7 @@ const resolvers = {
         login: async (root, args) => {
             const user = await User.findOne({ username: args.username })
             if (!user || args.password !== "secret") {
-                return UserInputError("Username or password is typed wrongly!")
+                return new UserInputError("Username or password is typed wrongly!")
             }
             const userForToken = {
                 username: user.username,
@@ -187,10 +191,7 @@ const resolvers = {
     },
     Subscription: {
         bookAdded: {
-            subscribe: () => {
-                console.log(pubsub)
-                return pubsub.asyncIterator(['BOOK ADDED'])
-            }
+            subscribe: () =>  pubsub.asyncIterator(['BOOK ADDED'])
         }
     }
 };
@@ -217,11 +218,9 @@ const resolvers = {
             };
         }
     });
+    console.log(typeof server.graphqlPath)
     await server.start()
-    server.applyMiddleware({
-        app,
-        path: '/'
-    })
+    server.applyMiddleware({ app, path: '/' })
     const PORT = 4000
     httpServer.listen(PORT, () => console.log(`Connected to the server in ${PORT}`) );
 })();
