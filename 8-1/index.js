@@ -222,5 +222,5 @@ const resolvers = {
     await server.start()
     server.applyMiddleware({ app, path: '/' })
     const PORT = 4000
-    httpServer.listen(PORT, () => console.log(`Connected to the server in ${PORT}`) );
+    httpServer.listen(PORT, () => console.log(`Connected to the server in http://localhost/${PORT}/graphql`) );
 })();
