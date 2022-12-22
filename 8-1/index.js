@@ -1,5 +1,4 @@
 const { ApolloServer, gql, UserInputError } = require('apollo-server-express')
-const { ApolloServerPluginDrainServer } = require('apollo-server-core')
 const { execute, subscribe } = require('graphql')
 const { SubscriptionServer } = require('subscriptions-transport-ws')
 const { makeExecutableSchema } = require('@graphql-tools/schema')
@@ -13,13 +12,11 @@ const { nanoid } = require('nanoid')
 const Authors = require('./models/authors')
 const Books = require('./models/books')
 const User = require('./models/user')
-const { ApolloServerPluginDrainHttpServer } = require('apollo-server-core/dist/plugin/drainHttpServer')
 require('dotenv').config()
 mongoose.connect(process.env.MONGO_URI)
     .then(() => {
         console.log('hey')
     })
-
 const JWT_SECRET = "Secure"
 const app = express()
 const httpServer = http.createServer(app)
@@ -83,8 +80,8 @@ const typeDefs = gql`
 
 const resolvers = {
     Query: {
-        booksCount: () => Books.collection.countDocuments(),
-        authorsCount: () => Authors.collection.countDocuments(),
+        booksCount: async () => await Books.collection.countDocuments(),
+        authorsCount: async () => await Authors.collection.countDocuments(),
         allBooks: async (root, args) => {
             if (args.genre && args.author) {
                 return Books.find( { author: args.author, genres: args.genre} )
@@ -106,8 +103,8 @@ const resolvers = {
             const authors = await Authors.find({})
             return authors
         },
-        me: (root, args, context) => {
-            return context.currentUser
+        me: async (root, args, context) => {
+            return await context.currentUser
         }
     },
     // Book: {
@@ -218,7 +215,6 @@ const resolvers = {
             };
         }
     });
-    console.log(typeof server.graphqlPath)
     await server.start()
     server.applyMiddleware({ app, path: '/' })
     const PORT = 4000
